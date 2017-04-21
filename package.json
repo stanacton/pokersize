@@ -1,0 +1,18 @@
+{
+  "name": "pokersize",
+  "version": "1.0.0",
+  "description": "Pokersize app for remote teams.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "SEE LICENCE IN DPACTUM",
+  "dependencies": {
+    "@types/node": "^7.0.13",
+    "@types/socket.io": "^1.4.29",
+    "express": "^4.15.2",
+    "http": "0.0.0",
+    "socket.io": "^1.7.3"
+  }
+}

@@ -1,0 +1,196 @@
+<!doctype html>
+<html ng-app="PokerSize">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Remote Poker Size</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/angular-material/1.1.4/angular-material.min.css" />
+    <style>
+        .revealed-value {
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 200%;
+            text-align: center;
+        }
+
+
+    </style>
+</head>
+<body>
+    
+<div flex layout="column" layout-fill>
+
+    <md-toolbar class="md-toolbar-tools md-whiteframe-14dp" flex>
+        <h1>Poker Sizing</h1>
+    </md-toolbar>
+
+    <md-content flex layout-padding>
+
+        <div ng-controller="RoomCtrl">
+            <h2>Welcome {{ username }} </h2>
+            <div class="md-inline-form">
+                <md-input-container>
+                    <label>Username</label>
+                    <input ng-model="joinArgs.username">
+                </md-input-container>
+                <md-input-container>
+                    <md-button ng-click="joinRoom(joinArgs)">Join</md-button>
+                </md-input-container>
+            </div>
+            <section layout="row" layout-sm="column" layout-wrap>
+
+                <md-button ng-click="showVote()" class="md-raised md-accent">Reveal</md-button>
+                <md-button ng-click="newVote()" class="md-raised">New Vote</md-button>
+            </section>
+
+            <h3>Your Cards</h3>
+            <div flex layout="rows" layout-xs="column" >
+                <md-card>
+                    <md-card-content>
+                        <md-button ng-repeat="value in voteValues" ng-click="vote(value)" ng-class="['md-fab',{'md-primary': isSelected(value)}]">{{ value }}</button>
+                    </md-card-content>
+                </md-card>
+            </div>
+
+            <h3>Users</h3>
+            <div flex layout="columns" xs-layout="rows" layout-wrap>
+                <md-card md-theme="{{ showDarkTheme ? 'dark-grey' : 'default' }}" md-theme-watch ng-repeat="user in room.users">
+                    <md-card-title>
+                        <md-card-title-text>
+                            <span class="md-headline">{{ user.name }}</span>
+                            <span class="md-subheader" ng-show="user.voted">Voted</span>
+                        </md-card-title-text>
+                    </md-card-title>
+                    <md-card-content>
+                        <p class="revealed-value" ng-show="reveal">{{ user.voteValue }}</p>
+                    </md-card-content>
+                </md-card>
+            </div>
+        </div>
+    </md-content>
+</div>
+
+<script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script>
+
+  <!-- Angular Material Library -->
+  <script src="http://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+ 
+ <script>
+
+    var app = angular.module("PokerSize", ['ngMaterial']);
+
+    app.factory('socket', function ($rootScope) {
+        var socket = io();
+
+        return {
+            on: function (eventName, callback) {
+            socket.on(eventName, function () {  
+                var args = arguments;
+                $rootScope.$apply(function () {
+                callback.apply(socket, args);
+                });
+            });
+            },
+            emit: function (eventName, data, callback) {
+            socket.emit(eventName, data, function () {
+                var args = arguments;
+                $rootScope.$apply(function () {
+                if (callback) {
+                    callback.apply(socket, args);
+                }
+                });
+            })
+            }
+        };
+    });
+
+    app.controller("LobbyCtrl",['$scope','socket', function($scope, socket){
+        $scope.createRoom = function(joinArgs) {
+            socket.emit("createRoom", joinArgs, function(result) {
+                console.log(JSON.stringify(result, null, 4));
+            });
+        };
+    }]);
+
+    app.controller("RoomCtrl",['$scope','socket', function($scope,socket){
+        $scope.roomName = "default";
+        $scope.reveal = false;
+        $scope.joinArgs = {};
+
+        $scope.voteValues = ["0","1/2",1,2,3,5,8,13,20,40,100];
+        socket.emit("getRooms",{}, function(rooms){
+            $scope.rooms = rooms;
+        });
+
+        $scope.joinRoom = function(joinArgs) {
+            joinArgs.roomName = $scope.roomName;
+            localStorage.setItem("username", joinArgs.username);
+            $scope.username = joinArgs.username;
+            $scope
+            socket.emit("joinRoom", joinArgs, function(result) {
+                console.log(JSON.stringify(result, null, 4));
+            });
+        };
+
+        socket.on("rooms", function(rooms) {
+            console.log(JSON.stringify(rooms, null, 4));
+        });
+
+        socket.on("update", function(room) {
+            console.log(JSON.stringify(room, null, 4));
+            $scope.reveal = room.reveal;
+            $scope.room = room;
+        });
+
+        socket.on("reveal", function(room) {
+            $scope.reveal = true;
+        });
+
+        $scope.vote = function(voteValue) {
+            var args = {
+                roomName: $scope.roomName,
+                vote: voteValue
+            }
+            $scope.voteValue = voteValue;
+            socket.emit("vote", args, function(result) {
+                console.log(JSON.stringify(result, null, 4));
+            });
+        };
+
+        $scope.newVote = function() {
+            var args = {
+                roomName: $scope.roomName,
+            }
+
+            socket.emit("newVote", args, function(result) {
+                console.log(JSON.stringify(result, null, 4));
+            });
+        };
+
+        $scope.showVote = function() {
+            var args = {
+                roomName: $scope.roomName
+            };
+
+            socket.emit("reveal", args, function(result) {
+                console.log(JSON.stringify(result, null, 4));
+            });
+        };
+
+        $scope.isSelected = function(value) {
+            return value === $scope.voteValue;
+        }
+
+        var username = localStorage.getItem("username");
+        if (username) {
+            $scope.joinArgs.username = username;
+            $scope.joinRoom({username: username});
+        }
+    }]);
+</script>
+
+</body>
+</html>
