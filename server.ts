@@ -38,10 +38,15 @@ io.on('connection', function(socket){
         console.log('user disconnected');
     });
 
-    socket.on("getRooms", function(args, next) {
-        next(rooms);
+    socket.on("leave", function(args, next) {
+        if (!args || !args.roomName) {
+            return next({ status: "ERROR", message: "args.roomName is required."});
+        }        
+        
+        rooms[args.roomName].removeUser(socket.id);
 
-        socket.emit("rooms", rooms);
+        io.to(args.roomName).emit("update", rooms[args.roomName]);
+        next({ status: "SUCCESS" });
     });
 
     socket.on("createRoom", function(args, next) {
@@ -152,7 +157,7 @@ io.on('connection', function(socket){
 
         next({ status: "SUCCESS"});
 
-        io.to(args.roomName).emit("update", room);
+        io.to(args.roomName).emit("newVote", room);
     });
 
     socket.on("reveal", function(args, next) {

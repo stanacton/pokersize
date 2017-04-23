@@ -11,60 +11,65 @@
             font-size: 200%;
             text-align: center;
         }
-
+        #you-item {
+            padding-left: 17px;
+        }
 
     </style>
 </head>
-<body>
+<body  ng-controller="RoomCtrl">
     
 <div flex layout="column" layout-fill>
-
     <md-toolbar class="md-toolbar-tools md-whiteframe-14dp" flex>
-        <h1>Poker Sizing</h1>
+        <h1>DPactum Pokersizing</h1>
+        <span flex></span>
+        <md-button ng-click="showVote()" class="md-raised md-icon-button  md-accent md-mini">
+            <md-tooltip md-direction="bottom">Reveal Votes</md-tooltip>
+            <ng-md-icon icon="visibility">Reveal Votes</ng-md-icon>
+        </md-button>
+        <md-button ng-click="newVote()" class="md-raised md-icon-button md-mini">
+            <md-tooltip md-direction="bottom">New Vote</md-tooltip>
+            <ng-md-icon icon="replay"></ng-md-icon>
+    
+        </md-button>
+        <md-button ng-click="leave()" class="md-raised md-fab md-icon-button md-mini">
+            <md-tooltip md-direction="bottom">Leave Room</md-tooltip>
+            <ng-md-icon icon="logout"></ng-md-icon>
+        </md-button>
     </md-toolbar>
 
     <md-content flex layout-padding>
-
-        <div ng-controller="RoomCtrl">
+        <div>
             <h2>Welcome {{ username }} </h2>
-            <div class="md-inline-form">
-                <md-input-container>
-                    <label>Username</label>
-                    <input ng-model="joinArgs.username">
-                </md-input-container>
-                <md-input-container>
-                    <md-button ng-click="joinRoom(joinArgs)">Join</md-button>
-                </md-input-container>
-            </div>
-            <section layout="row" layout-sm="column" layout-wrap>
 
-                <md-button ng-click="showVote()" class="md-raised md-accent">Reveal</md-button>
-                <md-button ng-click="newVote()" class="md-raised">New Vote</md-button>
-            </section>
-
-            <h3>Your Cards</h3>
-            <div flex layout="rows" layout-xs="column" >
-                <md-card>
-                    <md-card-content>
-                        <md-button ng-repeat="value in voteValues" ng-click="vote(value)" ng-class="['md-fab',{'md-primary': isSelected(value)}]">{{ value }}</button>
-                    </md-card-content>
-                </md-card>
-            </div>
-
-            <h3>Users</h3>
-            <div flex layout="columns" xs-layout="rows" layout-wrap>
-                <md-card md-theme="{{ showDarkTheme ? 'dark-grey' : 'default' }}" md-theme-watch ng-repeat="user in room.users">
-                    <md-card-title>
-                        <md-card-title-text>
-                            <span class="md-headline">{{ user.name }}</span>
-                            <span class="md-subheader" ng-show="user.voted">Voted</span>
-                        </md-card-title-text>
-                    </md-card-title>
-                    <md-card-content>
-                        <p class="revealed-value" ng-show="reveal">{{ user.voteValue }}</p>
-                    </md-card-content>
-                </md-card>
-            </div>
+            <md-list>
+                <md-list-item ng-repeat="user in room.users | filter: {name: '!' + username }" class="md-whiteframe-1dp">
+                    <ng-md-icon icon="person"></ng-md-icon>&nbsp;
+                    <p>{{ user.name }}</p>
+                    <span>
+                        <ng-md-icon icon="reveal" ng-show="!user.voted && !reveal"></ng-md-icon>
+                        <ng-md-icon icon="done" ng-show="user.voted && !reveal"></ng-md-icon>
+                        <ng-md-icon icon="block" ng-show="!user.voted && reveal"></ng-md-icon>
+                        <span ng-show="reveal" class="user.voted && revealed-value">{{ user.voteValue }}</span>
+                    </span>
+                </md-list-item>
+                <md-list-item class="md-whiteframe-1dp" id="you-item">
+                    <ng-md-icon icon="person"></ng-md-icon>&nbsp;
+                    <p>You</p>
+                    <span>
+                         <md-fab-speed-dial md-open="votesOpen" md-direction="left" class="md-scale">
+                            <md-fab-trigger>
+                                <md-button aria-label="Display Vote Options" class="md-fab md-warn"  ng-class="['md-fab',{'md-primary': voteValue, 'md-warn': !voteValue}]" >{{ voteValue || "VOTE"}}</md-button>
+                            </md-fab-trigger>
+                           <md-fab-actions sytle="position:absolute;right:0" layout-wrap>
+                                <md-button ng-repeat="value in voteValues" ng-click="vote(value)" ng-class="['md-fab','md-raised','md-mini',{'md-primary': isSelected(value),'md-accent': !isSelected(value)}]">
+                                    {{ value }}
+                                </md-button>
+                            </md-fab-actions>
+                        </md-fab-speed-dial>
+                    </span>
+                </md-list-item>
+            </md-list>
         </div>
     </md-content>
 </div>
@@ -76,11 +81,14 @@
 
   <!-- Angular Material Library -->
   <script src="http://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
-<script src="/socket.io/socket.io.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/angular-material-icons/0.7.1/angular-material-icons.min.js"></script> 
+  <script src="//cdnjs.cloudflare.com/ajax/libs/SVG-Morpheus/0.3.2/svg-morpheus.js"></script> 
+
+  <script src="/socket.io/socket.io.js"></script>
  
  <script>
 
-    var app = angular.module("PokerSize", ['ngMaterial']);
+    var app = angular.module("PokerSize", ['ngMaterial','ngMdIcons']);
 
     app.factory('socket', function ($rootScope) {
         var socket = io();
@@ -115,7 +123,7 @@
         };
     }]);
 
-    app.controller("RoomCtrl",['$scope','socket', function($scope,socket){
+    app.controller("RoomCtrl",['$scope','socket','$mdDialog','$mdToast', function($scope,socket, $mdDialog, $mdToast){
         $scope.roomName = "default";
         $scope.reveal = false;
         $scope.joinArgs = {};
@@ -125,25 +133,44 @@
             $scope.rooms = rooms;
         });
 
+        var originatorEv;
+        $scope.openMenu = function($mdMenu, ev) {
+            originatorEv = ev;
+            $mdMenu.open(ev);
+        };
+
         $scope.joinRoom = function(joinArgs) {
             joinArgs.roomName = $scope.roomName;
             localStorage.setItem("username", joinArgs.username);
             $scope.username = joinArgs.username;
             $scope
             socket.emit("joinRoom", joinArgs, function(result) {
-                console.log(JSON.stringify(result, null, 4));
+                if (result.status !== "SUCCESS") {
+                    $mdToast.show(
+                      $mdToast.simple()
+                        .textContent(result.message)
+                        .position("top right" )
+                        .hideDelay(3000)
+                    );
+                    promptJoin();
+                    return;
+                }
             });
         };
 
-        socket.on("rooms", function(rooms) {
-            console.log(JSON.stringify(rooms, null, 4));
+        socket.on("update", function(room) {
+            updateRoom(room);
         });
 
-        socket.on("update", function(room) {
-            console.log(JSON.stringify(room, null, 4));
+        socket.on("newVote", function(room) {
+            $scope.voteValue = null;
+            updateRoom(room);
+        });
+
+        function updateRoom(room) {
             $scope.reveal = room.reveal;
             $scope.room = room;
-        });
+        }
 
         socket.on("reveal", function(room) {
             $scope.reveal = true;
@@ -156,7 +183,15 @@
             }
             $scope.voteValue = voteValue;
             socket.emit("vote", args, function(result) {
-                console.log(JSON.stringify(result, null, 4));
+                if (result.status !== "SUCCESS") {
+                    $mdToast.show(
+                      $mdToast.simple()
+                        .textContent(result.message)
+                        .position("top right" )
+                        .hideDelay(3000)
+                    );
+                    return;
+                }
             });
         };
 
@@ -166,7 +201,15 @@
             }
 
             socket.emit("newVote", args, function(result) {
-                console.log(JSON.stringify(result, null, 4));
+                if (result.status !== "SUCCESS") {
+                    $mdToast.show(
+                      $mdToast.simple()
+                        .textContent(result.message)
+                        .position("top right" )
+                        .hideDelay(3000)
+                    );
+                    return;
+                }
             });
         };
 
@@ -176,7 +219,15 @@
             };
 
             socket.emit("reveal", args, function(result) {
-                console.log(JSON.stringify(result, null, 4));
+                if (result.status !== "SUCCESS") {
+                    $mdToast.show(
+                      $mdToast.simple()
+                        .textContent(result.message)
+                        .position("top right" )
+                        .hideDelay(3000)
+                    );
+                    return;
+                }
             });
         };
 
@@ -184,12 +235,53 @@
             return value === $scope.voteValue;
         }
 
+        $scope.leave = function() {
+            $scope.voteValue = null;
+            socket.emit("leave",{roomName: $scope.roomName }, function(result) {
+                if (result.status !== "SUCCESS") {
+                    $mdToast.show(
+                      $mdToast.simple()
+                        .textContent(result.message)
+                        .position("top right" )
+                        .hideDelay(3000)
+                    );
+                    return;
+                }
+                localStorage.setItem("username", null);
+                $scope.room = null;
+                promptJoin();
+            });
+        }
+
+        $scope.opts = {votesOpen: false};
+
         var username = localStorage.getItem("username");
         if (username) {
             $scope.joinArgs.username = username;
             $scope.joinRoom({username: username});
+        } else {
+            promptJoin();
+        }
+
+        function promptJoin() {
+            console.log("tryingto promp");
+            var confirm = $mdDialog.prompt()
+                .title('Welcome to DPactum Pokersize')
+                .textContent('Enter your name.')
+                .placeholder('e.g. David Acton')
+                .ariaLabel('username')
+//                .initialValue()
+               // .targetEvent(ev)
+                .ok('Join!')
+                .cancel('Cancel');
+            $mdDialog.show(confirm).then(function(result) {
+                    $scope.username = username;
+                    $scope.joinRoom({username: result });
+                }, function() {
+                });
         }
     }]);
+
 </script>
 
 </body>
